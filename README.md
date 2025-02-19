@@ -107,8 +107,16 @@ A command-line password manager that uses GPG encryption to securely store your 
 
    b. Copy to clipboard (clears after 45 seconds):
 
+   - Copy first line only:
+
    ```bash
    mpass category/password-name -c
+   ```
+
+   - Copy entire content:
+
+   ```bash
+   mpass category/password-name -C
    ```
 
 ## Password Store Structure
