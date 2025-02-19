@@ -1,0 +1,217 @@
+#!/usr/bin/env python3
+
+import os
+import sys
+import subprocess
+import getpass
+import gnupg
+import argparse
+from pathlib import Path
+import pyperclip
+import threading
+import time
+
+PASSWORD_STORE_DIR = os.path.join(os.getcwd(), ".password-store")
+class PasswordStore:
+    def __init__(self):
+        self.gpg = gnupg.GPG()
+        self.password_dir = Path(PASSWORD_STORE_DIR)
+
+    def init(self, gpg_id):
+        """Initialize the password store with a GPG key"""
+        if not self.password_dir.exists():
+            os.makedirs(self.password_dir)
+            
+        gpg_id_file = self.password_dir / ".gpg-id"
+        
+        if gpg_id_file.exists():
+            # Read old GPG ID
+            with open(gpg_id_file, "r") as f:
+                old_gpg_id = f.read().strip()
+            
+            # Re-encrypt all existing passwords with new key
+            for file_path in self.password_dir.rglob("*.gpg"):
+                if file_path.is_file():
+                    # Decrypt with old key
+                    with open(file_path, "rb") as f:
+                        decrypted = self.gpg.decrypt(f.read())
+                    
+                    # Encrypt with new key
+                    encrypted = self.gpg.encrypt(str(decrypted), recipients=[gpg_id])
+                    
+                    # Save re-encrypted file
+                    with open(file_path, "wb") as f:
+                        f.write(str(encrypted).encode())
+                    
+                    rel_path = file_path.relative_to(self.password_dir)
+                    print(f"Re-encrypted {rel_path.with_suffix('')} with new key")
+
+        # Save new GPG ID
+        with open(gpg_id_file, "w") as f:
+            f.write(gpg_id)
+        print(f"Password store initialized for {gpg_id}")
+
+    def insert(self, path, password=None, multiline=False):
+        """Insert a new password"""
+        gpg_id = self._get_gpg_id()
+        if password is None:
+            try:
+                if multiline:
+                    # Check if input is coming from a file (stdin)
+                    if not sys.stdin.isatty():
+                        # Read stdin and handle BOM character
+                        content = sys.stdin.buffer.read()
+                        password = content.decode('utf-8-sig').strip()  # utf-8-sig handles BOM
+                    else:
+                        # Interactive multiline input
+                        print("Enter your multiline password. Press Enter on empty line to finish:")
+                        lines = []
+                        while True:
+                            line = input()
+                            if line:
+                                lines.append(line)
+                            else:
+                                break
+                        password = '\n'.join(lines)
+                else:
+                    password = getpass.getpass("Enter password: ")
+                    password_confirm = getpass.getpass("Retype password: ")
+                    if password != password_confirm:
+                        print("Error: passwords do not match")
+                        return
+            except KeyboardInterrupt:
+                print("\nInput terminated.")
+                return
+        
+        file_path = self.password_dir / f"{path}.gpg"
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        encrypted = self.gpg.encrypt(password, recipients=[gpg_id])
+        with open(file_path, "wb") as f:
+            f.write(str(encrypted).encode())
+        print(f"Password stored in {path}")
+
+    def get(self, path, copy_to_clipboard=False):
+        """Retrieve a password"""
+        if not self.password_dir.exists():
+            print(f"Error: Password store directory does not exist. Please initialize first.")
+            return None
+            
+        file_path = self.password_dir / f"{path}.gpg"
+        if not file_path.exists():
+            print(f"Error: {path} does not exist")
+            return None
+            
+        with open(file_path, "rb") as f:
+            decrypted = self.gpg.decrypt(f.read())
+            password = str(decrypted)
+            
+            if copy_to_clipboard:
+                pyperclip.copy(password)
+                print(f"Password copied to clipboard. Will clear in 45 seconds.")
+                
+                # Create a subprocess that will survive after the main program exits
+                subprocess.Popen([sys.executable, '-c', 
+                    'import time, pyperclip; time.sleep(45); pyperclip.copy("")'],
+                    start_new_session=True)
+                return None
+            return password
+
+    def remove(self, path):
+        """Remove a password"""
+        file_path = self.password_dir / f"{path}.gpg"
+        if file_path.exists():
+            confirm = input(f"Are you sure you want to remove {path}? [y/N] ")
+            if confirm.lower() == 'y':
+                os.remove(file_path)
+                print(f"Password removed from {path}")
+            else:
+                print("Removal aborted")
+        else:
+            print(f"Error: {path} does not exist")
+
+    def list(self):
+        """List all passwords"""
+        for path in self.password_dir.rglob("*.gpg"):
+            relative_path = path.relative_to(self.password_dir)
+            print(str(relative_path)[:-4])  # Remove .gpg extension
+
+    def _get_gpg_id(self, path=None):
+        """Get the GPG ID from .gpg-id file"""
+        if path:
+            # Handle absolute or relative path
+            password_dir = Path(path) / ".password-store"
+            gpg_id_file = password_dir / ".gpg-id"
+        else:
+            gpg_id_file = self.password_dir / ".gpg-id"
+        
+        if not gpg_id_file.exists():
+            raise Exception("Password store not initialized")
+        with open(gpg_id_file) as f:
+            if (path):
+                print(f"GPG ID file: {gpg_id_file}")
+            return f.read().strip()
+
+def main():
+    parser = argparse.ArgumentParser(description="Password store manager")
+    if len(sys.argv) == 1:
+        print("Error: Path required")
+        return
+    
+    store = PasswordStore()
+    
+    # If first argument doesn't match any command, treat it as a path for 'get'
+    if sys.argv[1] not in ["init", "insert", "remove", "list", "info"]:
+        path = sys.argv[1]
+        copy_flag = len(sys.argv) > 2 and sys.argv[2] == "-c"
+        password = store.get(path, copy_to_clipboard=copy_flag)
+        if password and not copy_flag:
+            print(password)
+        return
+        
+    parser.add_argument("command", choices=["init", "insert", "remove", "list", "info"])
+    parser.add_argument("args", nargs="*", help="Additional arguments")
+    parser.add_argument("-m", "--multiline", action="store_true", help="Insert multiline data from stdin")
+    
+    args = parser.parse_args()
+    
+    try:
+        if args.command == "init":
+            if not args.args:
+                print("Error: GPG ID required")
+                return
+            store.init(args.args[0])
+        
+        elif args.command == "insert":
+            if not args.args:
+                print("Error: Path required")
+                return
+            store.insert(args.args[0], multiline=args.multiline)
+        
+        elif args.command == "remove":
+            if not args.args:
+                print("Error: Path required")
+                return
+            store.remove(args.args[0])
+        
+        elif args.command == "list":
+            store.list()
+            
+        elif args.command == "info":
+            path = args.args[0] if args.args else "info"
+            if os.path.isabs(path) or os.path.exists(path):
+                try:
+                    gpg_id = store._get_gpg_id(path)
+                    print(f"Password store key: {gpg_id}")
+                except Exception:
+                    print("Error: Password store not initialized")
+            else:
+                password = store.get(path)
+                if password:
+                    print(password)
+            
+    except Exception as e:
+        print(f"Error: {str(e)}")
+
+if __name__ == "__main__":
+    main()
