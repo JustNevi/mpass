@@ -54,6 +54,15 @@ class PasswordStore:
     def insert(self, path, password=None, multiline=False):
         """Insert a new password"""
         gpg_id = self._get_gpg_id()
+        
+        # Check if path already exists
+        file_path = self.password_dir / f"{path}.gpg"
+        if file_path.exists():
+            confirm = input(f"An entry already exists for {path}. Overwrite it? [y/N] ")
+            if confirm.lower() != 'y':
+                print("Insertion aborted")
+                return
+                
         if password is None:
             try:
                 if multiline:
@@ -83,7 +92,6 @@ class PasswordStore:
                 print("\nInput terminated.")
                 return
         
-        file_path = self.password_dir / f"{path}.gpg"
         file_path.parent.mkdir(parents=True, exist_ok=True)
         
         encrypted = self.gpg.encrypt(password, recipients=[gpg_id])
