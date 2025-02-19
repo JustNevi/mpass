@@ -99,7 +99,7 @@ class PasswordStore:
             f.write(str(encrypted).encode())
         print(f"Password stored in {path}")
 
-    def get(self, path, copy_to_clipboard=False):
+    def get(self, path, copy_to_clipboard=False, copy_all=False):
         """Retrieve a password"""
         if not self.password_dir.exists():
             print(f"Error: Password store directory does not exist. Please initialize first.")
@@ -115,8 +115,10 @@ class PasswordStore:
             password = str(decrypted)
             
             if copy_to_clipboard:
-                pyperclip.copy(password)
-                print(f"Password copied to clipboard. Will clear in 45 seconds.")
+                # Copy first line only if copy_all is False
+                content_to_copy = password if copy_all else password.split('\n')[0]
+                pyperclip.copy(content_to_copy)
+                print(f"{'Password' if not copy_all else 'Content'} copied to clipboard. Will clear in 45 seconds.")
                 
                 # Create a subprocess that will survive after the main program exits
                 subprocess.Popen([sys.executable, '-c', 
@@ -171,8 +173,9 @@ def main():
     # If first argument doesn't match any command, treat it as a path for 'get'
     if sys.argv[1] not in ["init", "insert", "remove", "list", "info"]:
         path = sys.argv[1]
-        copy_flag = len(sys.argv) > 2 and sys.argv[2] == "-c"
-        password = store.get(path, copy_to_clipboard=copy_flag)
+        copy_flag = len(sys.argv) > 2 and sys.argv[2] in ["-c", "-C"]
+        copy_all = len(sys.argv) > 2 and sys.argv[2] == "-C"
+        password = store.get(path, copy_to_clipboard=copy_flag, copy_all=copy_all)
         if password and not copy_flag:
             print(password)
         return
