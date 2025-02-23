@@ -29,27 +29,39 @@ class PasswordStore:
             with open(gpg_id_file, "r") as f:
                 old_gpg_id = f.read().strip()
             
-            # Re-encrypt all existing passwords with new key
-            for file_path in self.password_dir.rglob("*.gpg"):
-                if file_path.is_file():
-                    # Decrypt with old key
-                    with open(file_path, "rb") as f:
-                        decrypted = self.gpg.decrypt(f.read())
-                    
-                    # Encrypt with new key
-                    encrypted = self.gpg.encrypt(str(decrypted), recipients=[gpg_id])
-                    
-                    # Save re-encrypted file
-                    with open(file_path, "wb") as f:
-                        f.write(str(encrypted).encode())
-                    
-                    rel_path = file_path.relative_to(self.password_dir)
-                    print(f"Re-encrypted {rel_path.with_suffix('')} with new key")
+            # Ask user before re-encrypting
+            confirm = input("GPG ID has changed. Re-encrypt all existing passwords with new key? [y/N] ")
+            if confirm.lower() == 'y':
+                # Re-encrypt all existing passwords with new key
+                for file_path in self.password_dir.rglob("*.gpg"):
+                    if file_path.is_file():
+                        # Decrypt with old key
+                        with open(file_path, "rb") as f:
+                            decrypted = self.gpg.decrypt(f.read())
+                            
+                        # Check if decryption was successful
+                        if not decrypted.ok:
+                            print(f"Error decrypting {file_path.name}: {decrypted.status}")
+                            print("Stopping re-encryption process")
+                            return
+                        
+                        # Encrypt with new key
+                        encrypted = self.gpg.encrypt(str(decrypted), recipients=[gpg_id])
+                        
+                        # Save re-encrypted file
+                        with open(file_path, "wb") as f:
+                            f.write(str(encrypted).encode())
+                        
+                        rel_path = file_path.relative_to(self.password_dir)
+                        print(f"Re-encrypted {rel_path.with_suffix('')} with new key")
+            else:
+                print("Skipping re-encryption of existing passwords")
 
         # Save new GPG ID
-        with open(gpg_id_file, "w") as f:
-            f.write(gpg_id)
-        print(f"Password store initialized for {gpg_id}")
+        if not gpg_id_file.exists() or gpg_id_file.exists() and confirm.lower() == 'y':
+            with open(gpg_id_file, "w") as f:
+                f.write(gpg_id)
+            print(f"Password store initialized for {gpg_id}")
 
     def insert(self, path, password=None, multiline=False):
         """Insert a new password"""
