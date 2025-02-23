@@ -63,17 +63,20 @@ class PasswordStore:
                 f.write(gpg_id)
             print(f"Password store initialized for {gpg_id}")
 
-    def insert(self, path, password=None, multiline=False, generate=False, generate_show=False):
+    def insert(self, path, password=None, multiline=False, generate=False, generate_show=False, force=False):
         """Insert a new password"""
         gpg_id = self._get_gpg_id()
         
         # Check if path already exists
         file_path = self.password_dir / f"{path}.gpg"
         if file_path.exists():
-            confirm = input(f"An entry already exists for {path}. Overwrite it? [y/N] ")
-            if confirm.lower() != 'y':
-                print("Insertion aborted")
-                return
+            if not force:
+                confirm = input(f"An entry already exists for {path}. Overwrite it? [y/N] ")
+                if confirm.lower() != 'y':
+                    print("Insertion aborted")
+                    return
+            else:
+                print(f"Overwriting {path} without confirmation (--force used)")
                 
         if password is None:
             try:
@@ -203,6 +206,7 @@ def main():
     parser.add_argument("command", choices=["init", "insert", "remove", "list", "info"])
     parser.add_argument("args", nargs="*", help="Additional arguments")
     parser.add_argument("-m", "--multiline", action="store_true", help="Insert multiline data from stdin")
+    parser.add_argument("-f", "--force", action="store_true", help="Force overwrite without confirmation")
     parser.add_argument("-g", "--generate", action="store_true", help="Generate password")
     parser.add_argument("-G", "--generate-show", action="store_true", help="Generate password and show")
     
@@ -219,7 +223,7 @@ def main():
             if not args.args:
                 print("Error: Path required")
                 return
-            store.insert(args.args[0], multiline=args.multiline, generate=args.generate, generate_show=args.generate_show)
+            store.insert(args.args[0], multiline=args.multiline, generate=args.generate, generate_show=args.generate_show, force=args.force)
         
         elif args.command == "remove":
             if not args.args:
