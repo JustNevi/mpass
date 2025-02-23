@@ -83,7 +83,7 @@ class PasswordStore:
                         return ''.join(random.choice(characters) for _ in range(length))
                     password = generate_password()
                     if generate_show:
-                        print("Generated password:", f"\033[93m{password}\033[0m", sep="\n")
+                        print("Generated password:", password, sep="\n")
                 else:
                     if multiline:
                         # Check if input is coming from a file (stdin)
