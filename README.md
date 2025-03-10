@@ -72,7 +72,7 @@ A command-line password manager that uses GPG encryption to securely store your 
 
 3. Insert a Password
 
-   You can insert a password in two ways:
+   You can insert a password in several ways:
 
    a. Interactive mode:
 
@@ -97,6 +97,24 @@ A command-line password manager that uses GPG encryption to securely store your 
    type file.txt | mpass insert category/password-name -m
    ```
 
+   d. Generate a password:
+
+   ```bash
+   mpass insert category/password-name -g
+   ```
+
+   e. Generate a password and display it:
+
+   ```bash
+   mpass insert category/password-name -G
+   ```
+
+   f. Force overwrite without confirmation:
+
+   ```bash
+   mpass insert category/password-name -f
+   ```
+
 4. Retrieve a Password
 
    a. Display password:
@@ -117,6 +135,27 @@ A command-line password manager that uses GPG encryption to securely store your 
 
    ```bash
    mpass category/password-name -C
+   ```
+
+5. Remove a Password
+
+   ```bash
+   mpass remove category/password-name
+   ```
+
+6. List All Passwords
+
+   ```bash
+   mpass list
+   ```
+
+7. Git Commands
+
+   You can run git commands within the password store directory:
+
+   ```bash
+   mpass git status
+   mpass git log
    ```
 
 ## Password Store Structure
