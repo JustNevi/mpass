@@ -35,7 +35,8 @@ class PasswordStore:
                 old_gpg_id = f.read().strip()
             
             # Ask user before re-encrypting
-            confirm = input("GPG ID has changed. Re-encrypt all existing passwords with new key? [y/N] ")
+            print("Password store already exists.")
+            confirm = input("Do you want to change the GPG ID and re-encrypt all existing passwords with the new key? [y/N] ")
             if confirm.lower() == 'y':
                 # Re-encrypt all existing passwords with new key
                 for file_path in self.password_dir.rglob("*.gpg"):
