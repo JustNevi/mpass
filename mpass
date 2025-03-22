@@ -54,9 +54,15 @@ class PasswordStore:
                         # Encrypt with new key
                         encrypted = self.gpg.encrypt(str(decrypted), recipients=[gpg_id])
                         
+                        # Check if encryption was successful
+                        if not encrypted.ok:
+                            print(f"Error encrypting {file_path.name}: {encrypted.status}")
+                            print("Stopping re-encryption process")
+                            return
+                        
                         # Save re-encrypted file
                         with open(file_path, "wb") as f:
-                            f.write(str(encrypted).encode())
+                            f.write(encrypted.data)
                         
                         rel_path = file_path.relative_to(self.password_dir)
                         print(f"Re-encrypted {rel_path.with_suffix('')} with new key")
@@ -127,7 +133,7 @@ class PasswordStore:
         
         encrypted = self.gpg.encrypt(password, recipients=[gpg_id])
         with open(file_path, "wb") as f:
-            f.write(str(encrypted).encode())
+            f.write(encrypted.data)
         print(f"Password stored in {path}")
         self._git_commit(f"Insert password for {path}")
 
