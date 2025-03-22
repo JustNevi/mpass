@@ -220,7 +220,7 @@ def main():
         return
         
     parser.add_argument("command", choices=["init", "insert", "remove", "list", "info", "git"])
-    parser.add_argument("args", nargs=argparse.REMAINDER, help="Additional arguments")
+    parser.add_argument("args", nargs="*", help="Additional arguments")
     parser.add_argument("-m", "--multiline", action="store_true", help="Insert multiline data from stdin")
     parser.add_argument("-f", "--force", action="store_true", help="Force overwrite without confirmation")
     parser.add_argument("-g", "--generate", action="store_true", help="Generate password")
